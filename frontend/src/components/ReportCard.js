@@ -5,6 +5,7 @@ import { FiMapPin, FiThumbsUp, FiMessageCircle, FiClock, FiCamera } from 'react-
 import { reportsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import ResolutionTimer from './ResolutionTimer';
 
 const CATEGORY_LABELS = {
   cleanliness: '🗑️ Cleanliness',
@@ -66,6 +67,16 @@ export default function ReportCard({ report, onUpvote }) {
 
         {/* ─── TITLE ─── */}
         <h3 style={styles.title}>{report.title}</h3>
+
+        {/* ─── RESOLUTION TIMER ─── */}
+        <div style={{ marginBottom: 8 }}>
+          <ResolutionTimer
+            createdAt={report.createdAt}
+            status={report.status}
+            urgency={report.urgency}
+          />
+        </div>
+
         <p style={styles.desc}>{report.description?.slice(0, 120)}{report.description?.length > 120 ? '...' : ''}</p>
 
         {/* ─── PHOTO THUMBNAIL ─── */}

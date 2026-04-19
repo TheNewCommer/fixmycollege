@@ -5,6 +5,7 @@ import { useSocket } from '../context/SocketContext';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
 import { FiCheckCircle, FiClock, FiAlertTriangle, FiLoader, FiUploadCloud, FiRefreshCw, FiX } from 'react-icons/fi';
+import ResolutionTimer from '../components/ResolutionTimer';
 
 const STATUS_OPTIONS = [
   { value: 'assigned', label: '🔵 Mark Assigned', color: '#1d4ed8' },
@@ -163,6 +164,13 @@ export default function AdminDashboard() {
                   <span style={{ fontSize: 11, color: '#9ab5a5', marginLeft: 'auto' }}>{formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}</span>
                 </div>
                 <h4 style={styles.reportTitle}>{report.title}</h4>
+                <div style={{ marginBottom: 6 }}>
+                  <ResolutionTimer
+                    createdAt={report.createdAt}
+                    status={report.status}
+                    urgency={report.urgency}
+                  />
+                </div>
                 <p style={styles.reportDesc}>{report.description?.slice(0, 100)}...</p>
                 <div style={styles.reportMeta}>
                   <span>📍 {report.location}</span>

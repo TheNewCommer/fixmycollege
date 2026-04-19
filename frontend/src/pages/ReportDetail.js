@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatDistanceToNow, format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { FiArrowLeft, FiThumbsUp, FiSend, FiMapPin, FiClock, FiActivity } from 'react-icons/fi';
+import ResolutionTimer from '../components/ResolutionTimer';
 
 const CATEGORY_LABELS = {
   cleanliness: '🗑️ Cleanliness', hostel_infrastructure: '🏠 Hostel Infrastructure',
@@ -75,6 +76,15 @@ export default function ReportDetail() {
         </div>
 
         <h1 style={styles.title}>{report.title}</h1>
+
+        {/* ─── RESOLUTION TIMER ─── */}
+        <div style={{ marginBottom: 16 }}>
+          <ResolutionTimer
+            createdAt={report.createdAt}
+            status={report.status}
+            urgency={report.urgency}
+          />
+        </div>
 
         {/* ─── STATUS PROGRESS ─── */}
         {report.status !== 'rejected' && (
