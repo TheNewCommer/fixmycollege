@@ -74,6 +74,9 @@ router.get('/', async (req, res) => {
     const filter = {};
     if (category) filter.category = category;
     if (status) filter.status = status;
+    if (req.query.excludeResolved === 'true') {
+  filter.status = { $nin: ['resolved', 'rejected'] };
+}
     if (urgency) filter.urgency = urgency;
     if (building) filter.building = building;
 

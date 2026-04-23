@@ -39,17 +39,28 @@ export default function Reports() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasNew, setHasNew] = useState(false);
-  const [filters, setFilters] = useState({ category: '', status: '', urgency: '' });
-  const [total, setTotal] = useState(0);
+const [filters, setFilters] = useState({ category: '', status: 'active_only', urgency: '' });  const [total, setTotal] = useState(0);
   const { on, off } = useSocket();
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     setHasNew(false);
     try {
-      const { data } = await reportsAPI.getAll({ ...filters, limit: 30 });
-      setReports(data.reports);
-      setTotal(data.total);
+const apiFilters = { ...filters, limit: 30 };
+if (filters.status === 'active_only') {
+  delete apiFilters.status;
+  apiFilters.excludeResolved = true;
+}
+const { data } = await reportsAPI.getAll(apiFilters);
+setReports(data.reports);
+setTotal(data.total);
+const { data: allData } = await reportsAPI.getAll({ limit: 500 });
+setStats({
+  pending: allData.reports.filter(r => r.status === 'pending').length,
+  inProgress: allData.reports.filter(r => r.status === 'in_progress').length,
+  resolved: allData.reports.filter(r => r.status === 'resolved').length,
+  critical: allData.reports.filter(r => r.urgency === 'critical').length,
+});
     } catch {
       toast.error('Failed to load reports');
     } finally {
@@ -78,15 +89,15 @@ export default function Reports() {
     setReports(prev => prev.map(r => r._id === reportId ? { ...r, upvoteCount } : r));
   };
 
-  const handleFilterChange = (key, val) => setFilters(f => ({ ...f, [key]: val }));
-
+const handleFilterChange = (key, val) => {
+  if (key === 'status' && val === '') {
+    setFilters(f => ({ ...f, status: 'active_only' }));
+  } else {
+    setFilters(f => ({ ...f, [key]: val }));
+  }
+};
   // Stats
-  const stats = {
-    pending: reports.filter(r => r.status === 'pending').length,
-    inProgress: reports.filter(r => r.status === 'in_progress').length,
-    resolved: reports.filter(r => r.status === 'resolved').length,
-    critical: reports.filter(r => r.urgency === 'critical').length,
-  };
+  const [stats, setStats] = useState({ pending: 0, inProgress: 0, resolved: 0, critical: 0 });
 
   return (
     <div className="page">
@@ -116,6 +127,35 @@ export default function Reports() {
           </div>
         ))}
       </div>
+      {/* ─── TABS ─── */}
+<div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+  <button
+    onClick={() => handleFilterChange('status', '')}
+    style={{
+      padding: '8px 20px', borderRadius: 8, border: '1.5px solid',
+      fontWeight: 600, fontSize: 14, cursor: 'pointer',
+      fontFamily: 'DM Sans, sans-serif',
+      background: filters.status !== 'resolved' ? '#0f4c35' : 'white',
+      color: filters.status !== 'resolved' ? 'white' : '#6b8a78',
+      borderColor: filters.status !== 'resolved' ? '#0f4c35' : '#e2e8e4',
+    }}
+  >
+    🔴 Active Issues
+  </button>
+  <button
+    onClick={() => handleFilterChange('status', 'resolved')}
+    style={{
+      padding: '8px 20px', borderRadius: 8, border: '1.5px solid',
+      fontWeight: 600, fontSize: 14, cursor: 'pointer',
+      fontFamily: 'DM Sans, sans-serif',
+      background: filters.status === 'resolved' ? '#16a34a' : 'white',
+      color: filters.status === 'resolved' ? 'white' : '#6b8a78',
+      borderColor: filters.status === 'resolved' ? '#16a34a' : '#e2e8e4',
+    }}
+  >
+    ✅ Resolved Issues ({stats.resolved})
+  </button>
+</div>
 
       {/* ─── NEW REPORT BANNER ─── */}
       {hasNew && (
