@@ -18,4 +18,5 @@ backend/build/
 
 # Logs
 *.log
-npm-debug.log*
+npm-debug.log*.DS_Store
+**/.DS_Store
