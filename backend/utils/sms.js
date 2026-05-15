@@ -6,15 +6,15 @@ const client = twilio(
 );
 
 // ─── DOMAIN TO ADMIN PHONE MAPPING ───────────────────────
-const domainPhoneMap = {
-  hostel: process.env.ADMIN_HOSTEL_PHONE,
-  mess: process.env.ADMIN_MESS_PHONE,
-  campus: process.env.ADMIN_CAMPUS_PHONE,
-  cleanliness: process.env.ADMIN_CAMPUS_PHONE,
-  tech: process.env.ADMIN_CAMPUS_PHONE,
-  ragging: process.env.ADMIN_RAGGING_PHONE,
-  wellbeing: process.env.ADMIN_CAMPUS_PHONE,
-  superadmin: process.env.SUPERADMIN_PHONE,
+const getAdminPhone = (domain) => {
+  // Mess category → mess admin
+  if (domain === 'mess') return process.env.ADMIN_MESS_PHONE;
+  // Tech/WiFi category → tech admin
+  if (domain === 'tech') return process.env.ADMIN_TECH_PHONE;
+  // Ragging → private ragging number
+  if (domain === 'ragging') return process.env.ADMIN_RAGGING_PHONE;
+  // Everything else → default (your number)
+  return process.env.ADMIN_DEFAULT_PHONE;
 };
 
 // ─── SEND SMS ─────────────────────────────────────────────
@@ -39,7 +39,7 @@ const sendSMS = async (to, message) => {
 
 // ─── NOTIFY ADMIN — NEW CIVIC REPORT ─────────────────────
 const notifyAdminNewReport = async (report) => {
-  const phone = domainPhoneMap[report.adminDomain];
+  const phone = getAdminPhone(report.adminDomain);
   const urgencyEmoji = { low: '🟢', medium: '🟡', high: '🟠', critical: '🔴' };
   const message =
     `${urgencyEmoji[report.urgency] || '🔴'} FixMyCollege Alert!\n` +
@@ -53,7 +53,7 @@ const notifyAdminNewReport = async (report) => {
 
 // ─── NOTIFY RAGGING ADMIN ─────────────────────────────────
 const notifyRaggingAdmin = async (post) => {
-  const phone = domainPhoneMap['ragging'];
+  const phone = getAdminPhone('ragging');
   const message =
     `🚨 URGENT — FixMyCollege\n` +
     `A RAGGING report has been submitted.\n` +
@@ -64,7 +64,7 @@ const notifyRaggingAdmin = async (post) => {
 
 // ─── NOTIFY SUPERADMIN ────────────────────────────────────
 const notifySuperAdmin = async (message) => {
-  const phone = domainPhoneMap['superadmin'];
+  const phone = process.env.ADMIN_DEFAULT_PHONE;
   return sendSMS(phone, `[FixMyCollege SuperAdmin]\n${message}`);
 };
 
@@ -91,5 +91,5 @@ module.exports = {
   notifyRaggingAdmin,
   notifySuperAdmin,
   notifyReporterStatusUpdate,
-  domainPhoneMap,
+  getAdminPhone,
 };

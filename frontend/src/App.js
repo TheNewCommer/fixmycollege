@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 
 import Navbar from './components/Navbar';
+import ChatbotWidget from './components/ChatbotWidget';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -41,6 +42,7 @@ const AppRoutes = () => {
   return (
     <>
       <Navbar />
+      <ChatbotWidget />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />

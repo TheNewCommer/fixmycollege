@@ -12,6 +12,8 @@ const adminRoutes = require('./routes/admin');
 const wellbeingRoutes = require('./routes/wellbeing');
 const statsRoutes = require('./routes/stats');
 const aiRoutes = require('./routes/ai');
+const announcementRoutes = require('./routes/announcements');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const server = http.createServer(app);
@@ -57,6 +59,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/wellbeing', wellbeingRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ─── HEALTH CHECK ─────────────────────────────────────────
 app.get('/api/health', (req, res) => {

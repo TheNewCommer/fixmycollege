@@ -189,7 +189,8 @@ select.form-input { appearance: none; background-image: url("data:image/svg+xml,
 .divider { height: 1px; background: var(--border); margin: 24px 0; }
 
 /* ─── GRID ───────────────────────────────────────────────── */
-.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; align-items: start; }
+.grid-2 > * { align-self: start; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 

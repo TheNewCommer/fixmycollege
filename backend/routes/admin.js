@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Report = require('../models/Report');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const { protect, adminOnly, superAdminOnly } = require('../middleware/auth');
 const { uploadProofPhoto } = require('../utils/cloudinary');
 const { notifyReporterStatusUpdate, notifySuperAdmin } = require('../utils/sms');
@@ -91,6 +92,26 @@ router.patch('/reports/:id/status', async (req, res) => {
       );
     }
 
+    // ─── CREATE IN-APP NOTIFICATION ───────────────────────
+    if (report.reportedBy) {
+      const statusMessages = {
+        assigned: 'has been assigned to a worker',
+        in_progress: 'is now being worked on 🔧',
+        resolved: 'has been resolved ✅',
+        rejected: 'could not be processed ❌',
+      };
+      await Notification.create({
+        user: report.reportedBy._id,
+        type: 'status_update',
+        title: `Report ${status.replace('_', ' ')}`,
+        message: `Your report "${report.title}" ${statusMessages[status] || 'has been updated'}.${note ? ` Note: ${note}` : ''}`,
+        reportId: report._id,
+      });
+      // Real-time badge update
+      const io = req.app.get('io');
+      io.emit(`notification_${report.reportedBy._id}`, { type: 'status_update' });
+    }
+
     // Emit real-time update
     const io = req.app.get('io');
     io.emit('status_update', {
@@ -126,6 +147,18 @@ router.post('/reports/:id/proof', uploadProofPhoto.single('proof'), async (req, 
 
     const io = req.app.get('io');
     io.emit('status_update', { reportId: report._id, status: 'resolved' });
+
+    // ─── IN-APP NOTIFICATION ON RESOLVE ───────────────────
+    if (report.reportedBy) {
+      await Notification.create({
+        user: report.reportedBy,
+        type: 'status_update',
+        title: 'Report Resolved ✅',
+        message: `Your report "${report.title}" has been resolved with proof uploaded!`,
+        reportId: report._id,
+      });
+      io.emit(`notification_${report.reportedBy}`, { type: 'status_update' });
+    }
 
     res.json({ success: true, message: 'Proof uploaded and report resolved!', report });
   } catch (err) {

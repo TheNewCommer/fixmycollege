@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { adminAPI } from '../services/api';
+import { adminAPI, announcementsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
-import { FiCheckCircle, FiClock, FiAlertTriangle, FiLoader, FiUploadCloud, FiRefreshCw, FiX } from 'react-icons/fi';
+import { FiCheckCircle, FiClock, FiAlertTriangle, FiLoader, FiUploadCloud, FiRefreshCw, FiX, FiBell, FiPlusCircle } from 'react-icons/fi';
 import ResolutionTimer from '../components/ResolutionTimer';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 
 const STATUS_OPTIONS = [
   { value: 'assigned', label: '🔵 Mark Assigned', color: '#1d4ed8' },
@@ -16,6 +17,15 @@ const STATUS_OPTIONS = [
 
 const URGENCY_COLORS = { critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#16a34a' };
 
+const STATUS_TABS = [
+  { value: '', label: 'All', color: '#0f4c35' },
+  { value: 'pending', label: '⏳ Pending', color: '#92400e' },
+  { value: 'assigned', label: '🔵 Assigned', color: '#1d4ed8' },
+  { value: 'in_progress', label: '🟡 In Progress', color: '#d97706' },
+  { value: 'resolved', label: '✅ Resolved', color: '#16a34a' },
+  { value: 'rejected', label: '❌ Rejected', color: '#dc2626' },
+];
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { on, off } = useSocket();
@@ -23,19 +33,25 @@ export default function AdminDashboard() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pending: 0, inProgress: 0, resolved: 0 });
-  const [filters, setFilters] = useState({ status: '', urgency: '' });
+  const [statusTab, setStatusTab] = useState('');
+  const [urgencyFilter, setUrgencyFilter] = useState('');
   const [activeReport, setActiveReport] = useState(null);
   const [actionForm, setActionForm] = useState({ status: '', note: '' });
   const [proofFile, setProofFile] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [hasNew, setHasNew] = useState(false);
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     setHasNew(false);
     try {
-      const { data } = await adminAPI.getReports({ ...filters, limit: 50 });
-      setReports(data.reports);
+      const { data } = await adminAPI.getReports({ status: statusTab, urgency: urgencyFilter, limit: 50 });
+      // Sort by most recent first
+      const sorted = [...data.reports].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setReports(sorted);
       setStats({
         total: data.total,
         pending: data.reports.filter(r => r.status === 'pending').length,
@@ -44,7 +60,7 @@ export default function AdminDashboard() {
       });
     } catch { toast.error('Failed to fetch reports'); }
     finally { setLoading(false); }
-  }, [filters]);
+  }, [statusTab, urgencyFilter]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
 
@@ -92,8 +108,27 @@ export default function AdminDashboard() {
     ? `${user.adminDomain.charAt(0).toUpperCase() + user.adminDomain.slice(1)} Admin`
     : 'Super Admin';
 
+  const handlePostAnnouncement = async () => {
+    if (!announcementForm.title.trim() || !announcementForm.content.trim()) {
+      toast.error('Title and content are required');
+      return;
+    }
+    setAnnouncementLoading(true);
+    try {
+      await announcementsAPI.create(announcementForm);
+      toast.success('Announcement posted to all students! 📢');
+      setAnnouncementForm({ title: '', content: '', type: 'info' });
+      setShowAnnouncementForm(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to post announcement');
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  };
+
   return (
     <div className="page">
+
       {/* ─── HEADER ─── */}
       <div style={styles.header}>
         <div>
@@ -103,7 +138,47 @@ export default function AdminDashboard() {
             {user?.role === 'superadmin' && <span style={styles.superBadge}>⚡ Super Admin</span>}
           </p>
         </div>
-        <button className="btn btn-outline btn-sm" onClick={fetchReports}><FiRefreshCw size={14} /> Refresh</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-outline btn-sm" onClick={() => setShowAnnouncementForm(o => !o)}>
+            <FiBell size={14} /> Post Announcement
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={fetchReports}>
+            <FiRefreshCw size={14} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* ─── ANNOUNCEMENT FORM ─── */}
+      {showAnnouncementForm && (
+        <div style={styles.announcementForm}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 700, color: '#0d1f18' }}>📢 Post Announcement to Students</h3>
+            <button onClick={() => setShowAnnouncementForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ab5a5' }}><FiX size={18} /></button>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+            <input className="form-input" style={{ flex: 2, minWidth: 200 }} placeholder="Announcement title..."
+              value={announcementForm.title} onChange={e => setAnnouncementForm(f => ({ ...f, title: e.target.value }))} />
+            <select className="form-input" style={{ flex: 1, minWidth: 130 }}
+              value={announcementForm.type} onChange={e => setAnnouncementForm(f => ({ ...f, type: e.target.value }))}>
+              <option value="info">ℹ️ Info</option>
+              <option value="success">✅ Notice</option>
+              <option value="warning">⚠️ Warning</option>
+              <option value="urgent">🚨 Urgent</option>
+            </select>
+          </div>
+          <textarea className="form-input" rows={3} placeholder="Write your announcement message here..."
+            value={announcementForm.content} onChange={e => setAnnouncementForm(f => ({ ...f, content: e.target.value }))}
+            style={{ marginBottom: 10, resize: 'vertical' }} />
+          <button className="btn btn-primary" onClick={handlePostAnnouncement} disabled={announcementLoading}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <FiBell size={14} /> {announcementLoading ? 'Posting...' : 'Post to All Students'}
+          </button>
+        </div>
+      )}
+
+      {/* ─── ACTIVE ANNOUNCEMENTS — with gap from form ─── */}
+      <div style={{ marginTop: showAnnouncementForm ? 0 : 4 }}>
+        <AnnouncementBanner />
       </div>
 
       {/* ─── NEW REPORT ALERT ─── */}
@@ -129,17 +204,29 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* ─── FILTERS ─── */}
-      <div style={styles.filters}>
-        <select className="form-input" style={styles.filterSel} value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
-          <option value="">All Statuses</option>
-          <option value="pending">⏳ Pending</option>
-          <option value="assigned">🔵 Assigned</option>
-          <option value="in_progress">🟡 In Progress</option>
-          <option value="resolved">✅ Resolved</option>
-          <option value="rejected">❌ Rejected</option>
-        </select>
-        <select className="form-input" style={styles.filterSel} value={filters.urgency} onChange={e => setFilters(f => ({ ...f, urgency: e.target.value }))}>
+      {/* ─── STATUS TABS ─── */}
+      <div style={styles.statusTabsRow}>
+        <div style={styles.statusTabs}>
+          {STATUS_TABS.map(t => (
+            <button
+              key={t.value}
+              onClick={() => setStatusTab(t.value)}
+              style={{
+                ...styles.statusTab,
+                background: statusTab === t.value ? t.color : 'white',
+                color: statusTab === t.value ? 'white' : '#6b8a78',
+                borderColor: statusTab === t.value ? t.color : '#e2e8e4',
+                fontWeight: statusTab === t.value ? 700 : 500,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Urgency filter */}
+        <select className="form-input" style={{ width: 'auto', minWidth: 150, fontSize: 13 }}
+          value={urgencyFilter} onChange={e => setUrgencyFilter(e.target.value)}>
           <option value="">All Urgencies</option>
           <option value="critical">🔴 Critical</option>
           <option value="high">🟠 High</option>
@@ -148,7 +235,7 @@ export default function AdminDashboard() {
         </select>
       </div>
 
-      {/* ─── REPORTS TABLE/CARDS ─── */}
+      {/* ─── REPORTS LIST ─── */}
       {loading ? (
         <div className="loading-page"><div className="spinner" /></div>
       ) : reports.length === 0 ? (
@@ -161,15 +248,13 @@ export default function AdminDashboard() {
                 <div style={styles.reportTop}>
                   <span className={`badge badge-${report.urgency}`}>{report.urgency}</span>
                   <span className={`badge badge-${report.status}`}>{report.status.replace('_', ' ')}</span>
-                  <span style={{ fontSize: 11, color: '#9ab5a5', marginLeft: 'auto' }}>{formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}</span>
+                  <span style={{ fontSize: 11, color: '#9ab5a5', marginLeft: 'auto' }}>
+                    🕐 {formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}
+                  </span>
                 </div>
                 <h4 style={styles.reportTitle}>{report.title}</h4>
                 <div style={{ marginBottom: 6 }}>
-                  <ResolutionTimer
-                    createdAt={report.createdAt}
-                    status={report.status}
-                    urgency={report.urgency}
-                  />
+                  <ResolutionTimer createdAt={report.createdAt} status={report.status} urgency={report.urgency} />
                 </div>
                 <p style={styles.reportDesc}>{report.description?.slice(0, 100)}...</p>
                 <div style={styles.reportMeta}>
@@ -203,8 +288,6 @@ export default function AdminDashboard() {
               <button onClick={() => setActiveReport(null)} style={styles.closeBtn}><FiX size={18} /></button>
             </div>
             <p style={{ fontSize: 13, color: '#6b8a78', marginBottom: 18 }}>"{activeReport.title}"</p>
-
-            {/* Status Update */}
             <div className="form-group">
               <label className="form-label">Update Status</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -216,19 +299,14 @@ export default function AdminDashboard() {
                 ))}
               </div>
             </div>
-
             <div className="form-group">
               <label className="form-label">Note for Reporter {actionForm.status === 'rejected' ? '(Required)' : '(Optional)'}</label>
               <textarea className="form-input" rows={2} placeholder="e.g. Plumber has been called, will fix by evening..." value={actionForm.note} onChange={e => setActionForm(f => ({ ...f, note: e.target.value }))} />
             </div>
-
             <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 16 }} onClick={handleStatusUpdate} disabled={actionLoading || !actionForm.status}>
               {actionLoading ? '...' : 'Update Status'}
             </button>
-
             <div style={styles.divider}><span>OR</span></div>
-
-            {/* Proof Upload */}
             <div className="form-group" style={{ marginTop: 16 }}>
               <label className="form-label">Upload Proof Photo (marks as Resolved)</label>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => setProofFile(e.target.files[0])} />
@@ -252,14 +330,16 @@ export default function AdminDashboard() {
 }
 
 const styles = {
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 },
+  announcementForm: { background: '#f8faf9', border: '1.5px solid #e2e8e4', borderRadius: 14, padding: 20, marginBottom: 16 },
   title: { fontFamily: 'Syne, sans-serif', fontSize: 26, fontWeight: 800, color: '#0d1f18', marginBottom: 4 },
   subtitle: { fontSize: 14, color: '#9ab5a5', display: 'flex', alignItems: 'center', gap: 8 },
   superBadge: { background: '#fef9c3', color: '#854d0e', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 },
   alertBanner: { background: '#0f4c35', color: 'white', padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: 16 },
   statCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 20, borderRadius: 14, border: '1px solid', textAlign: 'center' },
-  filters: { display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' },
-  filterSel: { width: 'auto', flex: '1 1 150px', maxWidth: 200, padding: '8px 32px 8px 12px', fontSize: 13 },
+  statusTabsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' },
+  statusTabs: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  statusTab: { padding: '7px 14px', borderRadius: 10, border: '1.5px solid', fontSize: 13, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' },
   reportRow: { background: 'white', borderRadius: 12, border: '1px solid #e2e8e4', padding: 18, display: 'flex', gap: 16, alignItems: 'flex-start', boxShadow: '0 1px 4px rgba(15,76,53,0.05)' },
   reportMain: { flex: 1 },
   reportTop: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' },
@@ -273,5 +353,5 @@ const styles = {
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   closeBtn: { background: 'none', border: 'none', color: '#6b8a78', cursor: 'pointer', padding: 4, borderRadius: 6 },
   statusOption: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: '1.5px solid', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' },
-  divider: { display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0', '& span': { fontSize: 12, color: '#9ab5a5', background: 'white', padding: '0 8px' } },
+  divider: { display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0' },
 };

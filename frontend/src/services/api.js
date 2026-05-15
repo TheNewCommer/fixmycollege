@@ -71,11 +71,26 @@ export const aiAPI = {
   classify: (description) => API.post('/ai/classify', { description }),
   sentiment: (content, category) => API.post('/ai/sentiment', { content, category }),
   detectDuplicate: (description, category) => API.post('/ai/detect-duplicate', { description, category }),
+  chat: (messages) => API.post('/ai/chat', { messages }),
 };
 
 // ─── STATS ────────────────────────────────────────────────
 export const statsAPI = {
   get: () => API.get('/stats'),
+};
+
+// ─── ANNOUNCEMENTS ────────────────────────────────────────
+export const announcementsAPI = {
+  getAll: () => API.get('/announcements'),
+  create: (data) => API.post('/announcements', data),
+  delete: (id) => API.delete(`/announcements/${id}`),
+};
+
+// ─── NOTIFICATIONS ────────────────────────────────────────
+export const notificationsAPI = {
+  getAll: () => API.get('/notifications'),
+  markAllRead: () => API.patch('/notifications/read-all'),
+  markOneRead: (id) => API.patch(`/notifications/${id}/read`),
 };
 
 export default API;
