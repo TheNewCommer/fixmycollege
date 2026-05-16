@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { reportsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatDistanceToNow, format } from 'date-fns';
 import toast from 'react-hot-toast';
-import { FiArrowLeft, FiThumbsUp, FiSend, FiMapPin, FiClock, FiActivity } from 'react-icons/fi';
+import { FiArrowLeft, FiThumbsUp, FiSend, FiMapPin, FiClock, FiActivity, FiTrash2 } from 'react-icons/fi';
 import ResolutionTimer from '../components/ResolutionTimer';
 
 const CATEGORY_LABELS = {
@@ -17,11 +17,34 @@ const STATUS_STEPS = ['pending', 'assigned', 'in_progress', 'resolved'];
 
 export default function ReportDetail() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const handleDeleteReport = async () => {
+    if (!window.confirm('Are you sure you want to delete this report? This cannot be undone.')) return;
+    try {
+      await reportsAPI.deleteReport(id);
+      toast.success('Report deleted successfully');
+      navigate('/reports');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete report');
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Delete this comment?')) return;
+    try {
+      const { data } = await reportsAPI.deleteComment(id, commentId);
+      setReport(r => ({ ...r, comments: data.comments }));
+      toast.success('Comment deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete comment');
+    }
+  };
 
   useEffect(() => {
     reportsAPI.getOne(id)
@@ -60,7 +83,14 @@ export default function ReportDetail() {
 
   return (
     <div className="page" style={{ maxWidth: 760 }}>
-      <Link to="/reports" style={styles.back}><FiArrowLeft size={16} /> Back to Reports</Link>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+        <Link to="/reports" style={styles.back}><FiArrowLeft size={16} /> Back to Reports</Link>
+        {user && (isAdmin || (report.reportedBy?._id === user._id && report.status === 'pending')) && (
+          <button onClick={handleDeleteReport} style={styles.deleteBtn}>
+            <FiTrash2 size={14} /> Delete Report
+          </button>
+        )}
+      </div>
 
       <div className="card" style={{ padding: 28, marginBottom: 20 }}>
         {/* ─── TOP ─── */}
@@ -193,10 +223,17 @@ export default function ReportDetail() {
               <div key={i} style={styles.comment}>
                 <div style={styles.commentAvatar}>{c.authorName?.charAt(0)?.toUpperCase() || '?'}</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d1f18' }}>{c.authorName || 'Anonymous'}</span>
-                    {c.isAdminComment && <span style={{ fontSize: 10, background: '#0f4c35', color: 'white', padding: '1px 7px', borderRadius: 100 }}>Admin</span>}
-                    <span style={{ fontSize: 11, color: '#9ab5a5' }}>{formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0d1f18' }}>{c.authorName || 'Anonymous'}</span>
+                      {c.isAdminComment && <span style={{ fontSize: 10, background: '#0f4c35', color: 'white', padding: '1px 7px', borderRadius: 100 }}>Admin</span>}
+                      <span style={{ fontSize: 11, color: '#9ab5a5' }}>{formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}</span>
+                    </div>
+                    {user && (isAdmin || c.author === user._id || c.author?._id === user._id || c.author?.toString() === user._id) && (
+                      <button onClick={() => handleDeleteComment(c._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: '2px 4px', display: 'flex', alignItems: 'center', opacity: 0.6, flexShrink: 0 }} title="Delete comment">
+                        <FiTrash2 size={13} />
+                      </button>
+                    )}
                   </div>
                   <p style={{ fontSize: 13, color: '#3d5a4a', lineHeight: 1.5 }}>{c.text}</p>
                 </div>
@@ -210,7 +247,8 @@ export default function ReportDetail() {
 }
 
 const styles = {
-  back: { display: 'inline-flex', alignItems: 'center', gap: 6, color: '#6b8a78', fontSize: 13, fontWeight: 500, marginBottom: 20, textDecoration: 'none' },
+  back: { display: 'inline-flex', alignItems: 'center', gap: 6, color: '#6b8a78', fontSize: 13, fontWeight: 500, textDecoration: 'none' },
+  deleteBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, color: '#dc2626', fontSize: 13, fontWeight: 600, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' },
   topRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 },
   title: { fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800, color: '#0d1f18', marginBottom: 20, lineHeight: 1.3 },
   progressWrap: { display: 'flex', alignItems: 'center', marginBottom: 24 },

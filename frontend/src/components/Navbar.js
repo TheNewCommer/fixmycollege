@@ -195,8 +195,8 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* ─── HAMBURGER — mobile only ─── */}
-          <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)}>
+          {/* ─── HAMBURGER — mobile only, always at far right ─── */}
+          <button className="nav-hamburger" style={{ marginLeft: 'auto' }} onClick={() => setMenuOpen(o => !o)}>
             {menuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
           </button>
         </div>

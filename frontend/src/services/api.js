@@ -42,6 +42,8 @@ export const reportsAPI = {
   getOne: (id) => API.get(`/reports/${id}`),
   upvote: (id) => API.post(`/reports/${id}/upvote`),
   addComment: (id, text) => API.post(`/reports/${id}/comments`, { text }),
+  deleteComment: (reportId, commentId) => API.delete(`/reports/${reportId}/comments/${commentId}`),
+  deleteReport: (id) => API.delete(`/reports/${id}`),
   getMyReports: () => API.get('/reports/my/reports'),
 };
 
@@ -62,6 +64,8 @@ export const wellbeingAPI = {
   getAll: (params) => API.get('/wellbeing', { params }),
   support: (id) => API.post(`/wellbeing/${id}/support`),
   addReply: (id, text) => API.post(`/wellbeing/${id}/reply`, { text }),
+  deletePost: (id) => API.delete(`/wellbeing/${id}`),
+  deleteReply: (postId, replyId) => API.delete(`/wellbeing/${postId}/replies/${replyId}`),
   getRaggingPosts: () => API.get('/wellbeing/ragging/private'),
   acknowledgeRagging: (id) => API.patch(`/wellbeing/ragging/${id}/acknowledge`),
 };

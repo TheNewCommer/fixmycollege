@@ -180,3 +180,56 @@ router.get('/my/reports', protect, async (req, res) => {
 });
 
 module.exports = router;
+
+// ─── DELETE OWN REPORT ────────────────────────────────────
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) return res.status(404).json({ success: false, message: 'Report not found.' });
+
+    // Only the reporter or admin can delete
+    const isOwner = report.reportedBy?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this report.' });
+    }
+
+    // Only allow delete if pending (not already in progress/resolved)
+    if (!isAdmin && report.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Cannot delete a report that is already being processed.' });
+    }
+
+    await Report.findByIdAndDelete(req.params.id);
+
+    const io = req.app.get('io');
+    io.emit('report_deleted', { reportId: req.params.id });
+
+    res.json({ success: true, message: 'Report deleted successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to delete report.' });
+  }
+});
+
+// ─── DELETE OWN COMMENT ───────────────────────────────────
+router.delete('/:id/comments/:commentId', protect, async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) return res.status(404).json({ success: false, message: 'Report not found.' });
+
+    const comment = report.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ success: false, message: 'Comment not found.' });
+
+    const isOwner = comment.author?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this comment.' });
+    }
+
+    report.comments.pull({ _id: req.params.commentId });
+    await report.save();
+
+    res.json({ success: true, message: 'Comment deleted.', comments: report.comments });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to delete comment.' });
+  }
+});

@@ -155,3 +155,47 @@ router.patch('/ragging/:id/acknowledge', protect, raggingAdminOnly, async (req, 
 });
 
 module.exports = router;
+
+// ─── DELETE OWN WELLBEING POST ────────────────────────────
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const WellbeingPost = require('../models/WellbeingPost');
+    const post = await WellbeingPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ success: false, message: 'Post not found.' });
+
+    const isOwner = post.author?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this post.' });
+    }
+
+    await WellbeingPost.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Post deleted successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to delete post.' });
+  }
+});
+
+// ─── DELETE WELLBEING REPLY ───────────────────────────────
+router.delete('/:id/replies/:replyId', protect, async (req, res) => {
+  try {
+    const WellbeingPost = require('../models/WellbeingPost');
+    const post = await WellbeingPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ success: false, message: 'Post not found.' });
+
+    const reply = post.replies?.id(req.params.replyId);
+    if (!reply) return res.status(404).json({ success: false, message: 'Reply not found.' });
+
+    const isOwner = reply.author?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Not authorized.' });
+    }
+
+    post.replies.pull({ _id: req.params.replyId });
+    await post.save();
+    res.json({ success: true, message: 'Reply deleted.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to delete reply.' });
+  }
+});

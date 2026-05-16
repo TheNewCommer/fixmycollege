@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
-import { FiHeart, FiMessageCircle, FiSend, FiShield, FiAlertTriangle, FiLoader } from 'react-icons/fi';
+import { FiHeart, FiMessageCircle, FiSend, FiShield, FiAlertTriangle, FiLoader, FiTrash2 } from 'react-icons/fi';
 import { aiAPI } from '../services/api';
 
 const CATEGORIES = [
@@ -23,7 +23,7 @@ const FEELINGS = [
 ];
 
 export default function WellbeingWall() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { on, off } = useSocket();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +92,31 @@ export default function WellbeingWall() {
       const { data } = await wellbeingAPI.support(id);
       setPosts(prev => prev.map(p => p._id === id ? { ...p, supportCount: data.supportCount } : p));
     } catch { toast.error('Failed'); }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Delete this post? This cannot be undone.')) return;
+    try {
+      await wellbeingAPI.deletePost(postId);
+      setPosts(prev => prev.filter(p => p._id !== postId));
+      toast.success('Post deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete post');
+    }
+  };
+
+  const handleDeleteReply = async (postId, replyId) => {
+    if (!window.confirm('Delete this reply?')) return;
+    try {
+      await wellbeingAPI.deleteReply(postId, replyId);
+      setPosts(prev => prev.map(p => p._id === postId
+        ? { ...p, replies: p.replies.filter(r => r._id !== replyId) }
+        : p
+      ));
+      toast.success('Reply deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete reply');
+    }
   };
 
   const handleReply = async (postId) => {
@@ -213,6 +238,12 @@ export default function WellbeingWall() {
                   <span style={{ ...styles.catTag, background: cat?.bg, color: cat?.color }}>{cat?.label}</span>
                   {feeling && <span style={styles.feelingTag}>{feeling.emoji} {post.feeling}</span>}
                   <span style={styles.timeTag}>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
+                  {/* Delete post button — show to author or admin */}
+                  {user && (isAdmin || post.author === user._id || post.author?._id === user._id || post.author?.toString() === user._id) && (
+                    <button onClick={() => handleDeletePost(post._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: '2px 4px', display: 'flex', alignItems: 'center', marginLeft: 'auto', opacity: 0.6 }} title="Delete post">
+                      <FiTrash2 size={14} />
+                    </button>
+                  )}
                 </div>
                 <p style={styles.postContent}>{post.content}</p>
                 <div style={styles.postActions}>
@@ -229,14 +260,21 @@ export default function WellbeingWall() {
                 {post.replies?.length > 0 && (
                   <div style={styles.repliesWrap}>
                     {post.replies.map((r, i) => (
-                      <div key={i} style={styles.replyItem}>
-                        <div style={{ ...styles.replyAvatar, background: r.isAdminReply ? '#0f4c35' : '#f0fdf4', color: r.isAdminReply ? 'white' : '#0f4c35' }}>
-                          {r.isAdminReply ? '👮' : '💬'}
+                      <div key={i} style={{ ...styles.replyItem, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', gap: 10, flex: 1 }}>
+                          <div style={{ ...styles.replyAvatar, background: r.isAdminReply ? '#0f4c35' : '#f0fdf4', color: r.isAdminReply ? 'white' : '#0f4c35' }}>
+                            {r.isAdminReply ? '👮' : '💬'}
+                          </div>
+                          <div>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: r.isAdminReply ? '#0f4c35' : '#3d5a4a' }}>{r.authorName}</span>
+                            <p style={{ fontSize: 13, color: '#3d5a4a', marginTop: 2 }}>{r.text}</p>
+                          </div>
                         </div>
-                        <div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: r.isAdminReply ? '#0f4c35' : '#3d5a4a' }}>{r.authorName}</span>
-                          <p style={{ fontSize: 13, color: '#3d5a4a', marginTop: 2 }}>{r.text}</p>
-                        </div>
+                        {user && (isAdmin || r.author === user._id || r.author?.toString() === user._id) && (
+                          <button onClick={() => handleDeleteReply(post._id, r._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', padding: '2px 4px', opacity: 0.6, flexShrink: 0 }} title="Delete reply">
+                            <FiTrash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
